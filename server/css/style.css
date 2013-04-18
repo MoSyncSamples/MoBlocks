@@ -1,0 +1,49 @@
+body {
+	background-color: black;
+}
+
+
+#main {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+	background-color: black;
+	background-image: url("../images/scores_background.png");
+	background-position: center top;
+	background-repeat: no-repeat;
+}
+
+#scoreBoard {
+	position: relative;
+	top: 250px;
+	margin: auto;
+	width: 350px;
+	border-collapse: collapse;
+	text-align: center;
+	color: white;
+}
+
+#scoreBoard th{
+	background-color: rgba(48, 80, 111, 1.0);
+	font-weight: normal;
+}
+
+#scoreBoard td{
+
+}
+
+.normal {
+	padding-top: 12px;
+	background-color: rgba(0,68,204,0.6);
+	border-bottom: 1px solid white;
+	border-color: rgba(255,255,255,0.3);
+}
+
+.first {
+	color:white;
+	background-color: rgba(95, 143, 80, 0.7);
+}

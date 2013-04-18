@@ -1,4 +1,13 @@
+		
+		document.addEventListener("deviceready", loadGameData, true);
 
+		// Global Vars Used for Mutiplayer Gaming Mode
+		var deviceUID, deviceName,
+			multiplayerMode, socket, socketIOScriptLoaded = false,
+			playerList = {},
+			multiplayerServer = "http://192.168.0.103:8085/";
+
+		var mWinnerName;
 		var mGameFieldTop;
 		var mGameFieldLeft;
 		var mGameFieldSize;
@@ -16,7 +25,8 @@
 			3 = game over
 			4 = game finished
 		*/
-		var mState;
+
+		var mState = 0;
 
 		var mIsMoving;
 
@@ -34,15 +44,117 @@
 
 		var mNumTypeBlocks = 5;
 
+		function loadGameData() {
+			mosync.app.screenSetOrientation(mosync.SCREEN_ORIENTATION_PORTRAIT);
+			
+			document.addEventListener("deviceready", function () {
+				// initialization of global vars 
+				// about player data like phone id 
+				// phone name
+				deviceUID = device.uuid;
+				deviceName = device.name;
+
+			}, true);
+
+			document.addEventListener("backbutton", function (){
+				mosync.bridge.send(["close"]);
+			}, true);
+		}
+
+		function menu() {
+			document.getElementById('menu').style.display = "block";
+			document.getElementById('single').style.display = 'block';
+			document.getElementById('multi').style.marginTop = "10pt";
+			document.getElementById('connectionControls').style.display = "none";
+			document.getElementById('loading').style.display = "none";
+			document.getElementById('gameCanvas').style.display = "none";
+		}
+
+		function singlePlayer() {
+			multiplayerMode = false;
+			document.getElementById('menu').style.display = "none";
+			document.getElementById('gameCanvas').style.display = "block";
+			initialize();
+		}
+
+		function showMultiplayer() {
+			document.getElementById('single').style.display = 'none';
+			document.getElementById('multi').style.marginTop = "70%";
+			document.getElementById('connectionControls').style.display = 'block';
+			document.getElementById('name').value = deviceName;
+		}
 		
+		function connectToServer() {
+			var name = document.getElementById('name').value,
+				server = document.getElementById('serverip').value;
+			if (name === "" || server === "") {
+				// try to connect to the server
+				alert("Name or serverip is empty.");
+			} else {
+				document.getElementById('loading').style.display = "block";
+				deviceName = name;
+				multiplayerServer = server;
+
+				if (socketIOScriptLoaded){
+					multiplayer();
+				} else {
+					$.getScript("http://" + multiplayerServer + ":8085/socket.io/socket.io.js", function (){
+						multiplayer();
+						socketIOScriptLoaded = true;
+					}).fail(function () {
+						document.getElementById('loading').style.display = "none";
+						mosync.rlog("Failure connecting with server " + multiplayerServer);
+					});
+				}
+			}
+		}
+
+		function multiplayer() {
+			document.getElementById('connectionControls').style.display = 'block';
+			socket = io.connect("http://" + multiplayerServer + ":8085/", {'force new connection': true});
+			
+			document.getElementById('loading').style.display = "block";
+			
+			// Register to the server
+			socket.emit("register", {
+				id : deviceUID,
+				name: deviceName
+			});
+
+			// initialize
+			socket.on("start", function (){
+				document.getElementById('menu').style.display = "none";
+				document.getElementById('loading').style.display = "none";
+				document.getElementById('gameCanvas').style.display = "block";
+
+				multiplayerMode = true;
+				initialize();
+			});
+
+			socket.on("scores", function (data) {
+				playerList = data;
+			});
+
+			socket.on("win", function (data) {
+				mWinnerName = data.player;
+				mState = 3;
+			});
+		}
+
+		function sendScore(score) {
+			if (multiplayerMode) {
+				socket.emit("score", {
+					id: deviceUID,
+					score: score
+				});
+			}
+		}
 
 		/**
 		 * Initialization.
 		 */
 		 function initialize()
 		 {
-			//document.addEventListener("deviceready", displayDeviceInfo, true);
-			//document.addEventListener("backbutton", close, true);
 
 			document.body.addEventListener('touchmove', function(event)
 			{
@@ -57,10 +169,18 @@
 				var touch = event.touches[0];
 				if(mState == 2)
 				{
-					if((touch.pageY > (mGameFieldTop+mGameFieldSize*10)) || (touch.pageY < mGameFieldTop))
+					if (touch.pageY < mGameFieldTop) {
+
+						mState = 0;
+						mosync.rlog("Disconnection");
+						socket.disconnect("close");
+						menu();
+					} else if (touch.pageY > (mGameFieldTop+mGameFieldSize*10)){
+
 						shuffleBlocks();
-					else
+					} else {
 						deleteBlock(touch.pageX, touch.pageY);
+					}
 				}
 				
 				else if((mState == 3) || (mState == 4))
@@ -111,6 +231,8 @@
 		   	mState = 2;
 
 		   	mScore = 0;
+
+		   	sendScore(mScore);
 	    }
 
 		function updateOrientation(sensorData)
@@ -158,10 +280,10 @@
 
 		function resizeCanvas()
 		{
-			mCanvas.width = window.innerWidth;
-			mCanvas.height = window.innerHeight;
 
-			mosync.rlog("rc width: " + mCanvas.width + " height:" + mCanvas.height);
+        	mCanvas.setAttribute('height', window.innerHeight);
+        	mCanvas.setAttribute('width', window.innerWidth);
+        	mContext.scale(1.0, 1.0);
 		}
 
 		function calculateGameSize()
@@ -425,9 +547,11 @@
 					var c = countNeighboursRecursive(mGameField[i]);
 
 					// now we can just deleted all the visited bricks..
-					if(c > 2)
+					if(c > 0)
 					{
-						mScore += c * 20;
+						mScore += (c * 20) + ((c-2) * 20);
+
+						sendScore(mScore);
 
 						while(true)
 						{
@@ -602,16 +726,23 @@
 			if(mGameField.length == 0)
 			{
 				mState = 4;
+
+				if(multiplayerMode) {
+					socket.emit("win", { id : deviceUID});	
+				}
+				
 				return true;
 			}
-
-			for(var i = 0; i < mNumTypeBlocks; i++)
+			// Turn off game over check
+			/*
+			for(var i = 0; i < mNumTypeBlocks; i++) {
 				if((mColorOfEach[i] > 0) && (mColorOfEach[i] < 3))
 				{
 					mState = 3;
 					return true;
 				}
-
+			}*/
+				
 			return false;
 		}
 
@@ -627,6 +758,7 @@
 					moveTiles();
 					draw();
 					drawScore();
+					drawOtherScores();
 				}
 			}
 			else if(mState == 3)
@@ -645,6 +777,7 @@
 				mContext.restore();
 
 				drawScore();
+				drawOtherScores();
 
 				var sx1 = Math.sin(time * 0.001) * 60.0;
 				var sy1 = Math.sin(time * 0.002) * Math.cos(time*0.003) * Math.sin(time*0.001) *  30.0;
@@ -678,6 +811,16 @@
 				mContext.fillStyle = "rgb(200, 200, 200)";
 				mContext.fillText("Game", sx1 + w, sy1 + h - 16);
 				mContext.fillText("Over", sx2 + w, sy2 + h + h/4);
+
+				mContext.font = "30px TrebuchetMS";
+				mContext.fillStyle = "rgb(40, 40, 40)";
+				mContext.fillText("Winner: " + mWinnerName, 
+								  sx1 + w + 4, sy1 + h + h/2);
+
+				mContext.font = "30px TrebuchetMS";
+				mContext.fillStyle = "rgb(200, 200, 200)";
+				mContext.fillText("Winner: " + mWinnerName, 
+								  sx1 + w, sy1 + h + h/2);
 
 				mContext.restore();
 			}
@@ -832,3 +975,43 @@
 			mContext.restore();
 	    }
 
+	    function drawOtherScores()
+	    {
+	    	var x = 120;
+			var y = 12;
+
+	    	mContext.font = "12px TrebuchetMS";
+
+	    	mContext.save();
+
+	    	if(mOrientation == 2)
+			{
+				x = 120; y = 12;
+				mContext.translate(mCanvas.width, mCanvas.height);
+				mContext.rotate(Math.PI);
+			}
+			else if(mOrientation == 3)
+			{
+				x = 12; y = 60;
+				mContext.translate(mCanvas.width, 4);
+				mContext.rotate(Math.PI/2.0);
+			}
+			else if(mOrientation == 4)
+			{
+				x = 5; y = 60;
+				mContext.translate(0, mCanvas.height);
+				mContext.rotate(-Math.PI/2.0);
+			}
+			
+
+			for (i in playerList) {
+				if (i != deviceUID) {
+					mContext.fillStyle = "rgb(204, 223, 195)";
+					mContext.fillText(playerList[i].name + ": " + 
+									  playerList[i].score, x, y);
+					y += 12;
+				}
+			}
+
+			mContext.restore();
+	    }
