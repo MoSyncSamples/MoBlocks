@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>MoBlocks Scoreboard</title>
+        <script src="http://localhost:8085/socket.io/socket.io.js"></script>
+        <script type="text/javascript" charset="utf-8" src="./jquery-1.9.1.min.js"></script>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="author" href="humans.txt">
+        <script>
+        	var socket = io.connect('http://localhost:8085/');
+
+        	socket.on("scores", function (data) {
+                var highest = 0, highestId;
+                for (i in data) {
+
+                    var r = document.getElementById(i);
+
+                    // Add to the table list
+                    if (r === null) {
+                        
+                        var t = document.getElementById("scoreBoard");
+
+                        var r = t.insertRow(t.rows.length);
+                        r.id = i;
+                        r.style.class = "normal";
+
+                        var c1 = r.insertCell(0);
+                        c1.appendChild(document.createTextNode(data[i].name));
+
+                        var c2 = r.insertCell(1);
+                        c2.appendChild(document.createTextNode(data[i].score));
+
+                        $("#" + i).addClass("normal");
+
+                    } else {
+                        $("#" + i + " td:nth-child(2)").text(data[i].score);
+                    }
+                }
+
+                $("tr[id]").removeClass("first");
+
+                $("tr[id]").each( function (index, element) {
+                    
+                    var score = $("tr#"+element.id+ " td:nth-child(2)").text();
+                    if( score > highest){
+                        highest = score;
+                        highestId = element.id;
+                    }
+                });
+
+                if(highestId){
+                    $("tr#"+highestId).addClass("first");
+                }
+                    
+        	});
+    
+            socket.on("remove", function (id) {
+                $('#'+id).remove();
+            });
+
+        </script>
+    </head>
+    <body onload="socket.emit('scores');">
+        <div id="main">
+            <table id="scoreBoard">
+            	<tr>
+            		<th>Player</th>
+            		<th>Score</th>
+            	</tr>
+            </table>
+        </div>
+    </body>
+</html>
