@@ -1,11 +1,17 @@
-		
+		window.onbeforeunload = function (event) {
+			mosync.rlog("closing the game");
+			if (socket) {
+				socket.disconnect();
+			}
+		}
+
 		document.addEventListener("deviceready", loadGameData, true);
 
 		// Global Vars Used for Mutiplayer Gaming Mode
 		var deviceUID, deviceName,
 			multiplayerMode, socket, socketIOScriptLoaded = false,
 			playerList = {},
-			multiplayerServer = "http://192.168.0.103:8085/";
+			multiplayerServer = "192.168.0.103";
 
 		var mWinnerName;
 		var mGameFieldTop;
@@ -45,6 +51,7 @@
 		var mNumTypeBlocks = 5;
 
 		function loadGameData() {
+
 			mosync.app.screenSetOrientation(mosync.SCREEN_ORIENTATION_PORTRAIT);
 			
 			document.addEventListener("deviceready", function () {
@@ -53,15 +60,26 @@
 				// phone name
 				deviceUID = device.uuid;
 				deviceName = device.name;
+				document.getElementById('menu').style.display = "block";
 
 			}, true);
 
 			document.addEventListener("backbutton", function (){
-				mosync.bridge.send(["close"]);
+				if(multiplayerMode){
+					socket.disconnect();
+					menu();
+				}
+
+				if( mState = 0 ) {
+					mosync.bridge.send(["close"]);
+				}
+
 			}, true);
 		}
 
 		function menu() {
+
+			mState = 0;
 			document.getElementById('menu').style.display = "block";
 			document.getElementById('single').style.display = 'block';
 			document.getElementById('multi').style.marginTop = "10pt";
@@ -82,6 +100,7 @@
 			document.getElementById('multi').style.marginTop = "70%";
 			document.getElementById('connectionControls').style.display = 'block';
 			document.getElementById('name').value = deviceName;
+			document.getElementById('serverip').value = multiplayerServer;
 		}
 		
 		function connectToServer() {
@@ -110,6 +129,7 @@
 		}
 
 		function multiplayer() {
+
 			document.getElementById('connectionControls').style.display = 'block';
 			socket = io.connect("http://" + multiplayerServer + ":8085/", {'force new connection': true});
 			
@@ -136,8 +156,23 @@
 			});
 
 			socket.on("win", function (data) {
-				mWinnerName = data.player;
-				mState = 3;
+				// Check who is winning
+				var playerScore = 0, playerid;
+
+				for (var i in data){
+
+					if (data[i].score > playerScore) {
+						playerScore = data[i].score;
+						playerid = i;
+					}
+				}
+				
+				if(playerid === deviceUID) {
+					mState = 4;	
+				} else {
+					mWinnerName = data[playerid].name;
+					mState = 3;
+				}
 			});
 		}
 
@@ -173,7 +208,7 @@
 
 						mState = 0;
 						mosync.rlog("Disconnection");
-						socket.disconnect("close");
+						socket.disconnect();
 						menu();
 					} else if (touch.pageY > (mGameFieldTop+mGameFieldSize*10)){
 
@@ -725,9 +760,10 @@
 		{
 			if(mGameField.length == 0)
 			{
-				mState = 4;
+				//mState = 4;
 
 				if(multiplayerMode) {
+					mState = 5;
 					socket.emit("win", { id : deviceUID});	
 				}
 				
@@ -853,6 +889,38 @@
 				
 				mContext.fillStyle = "rgb(200, 200, 200)";
 				mContext.fillText("SUCCESS", 22, 196);
+
+				mContext.restore();
+			}
+			else if(mState == 5)
+			{
+				draw();
+
+				mContext.save();
+
+				if(mOrientation == 2)
+				{
+					mContext.translate(mCanvas.width, mCanvas.height);
+					mContext.rotate(Math.PI);
+				}
+				else if(mOrientation == 3)
+				{
+					mContext.translate(mCanvas.width*1.25, mCanvas.width/4.0);
+					mContext.rotate(Math.PI/2.0);
+				}
+				else if(mOrientation == 4)
+				{
+					mContext.translate(-mCanvas.width/4.0, mCanvas.width*1.25);
+					mContext.rotate(-Math.PI/2.0);
+				}
+
+				mContext.font = "70px TrebuchetMS";
+
+				mContext.fillStyle = "rgb(40, 40, 40)";
+				mContext.fillText("Waiting...", 26, 200);
+				
+				mContext.fillStyle = "rgb(200, 200, 200)";
+				mContext.fillText("Waiting...", 22, 196);
 
 				mContext.restore();
 			}

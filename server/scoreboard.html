@@ -5,12 +5,17 @@
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>MoBlocks Scoreboard</title>
-        <script src="http://localhost:8085/socket.io/socket.io.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
         <script type="text/javascript" charset="utf-8" src="./jquery-1.9.1.min.js"></script>
         <link rel="stylesheet" href="css/style.css">
         <link rel="author" href="humans.txt">
         <script>
-        	var socket = io.connect('http://localhost:8085/');
+            var ipAddress = location.href;
+
+            ipAddress = ipAddress.substring(ipAddress.indexOf("http://") + 7);
+            ipAddress = ipAddress.substring(0, ipAddress.indexOf(":"));
+
+        	var socket = io.connect("http://" + ipAddress +":8085/");
 
         	socket.on("scores", function (data) {
                 var highest = 0, highestId;
@@ -41,19 +46,23 @@
                 }
 
                 $("tr[id]").removeClass("first");
-
+                console.log("highest initial:" + highest);
                 $("tr[id]").each( function (index, element) {
                     
-                    var score = $("tr#"+element.id+ " td:nth-child(2)").text();
+                    var score = Number($("tr#"+element.id+ " td:nth-child(2)").text());
                     if( score > highest){
+                        console.log("Score: " + score + " Highest: " + highest);
                         highest = score;
                         highestId = element.id;
                     }
+                    console.log("highest:" + highest);
+                    console.log("highestId:" + highestId);
                 });
 
                 if(highestId){
                     $("tr#"+highestId).addClass("first");
                 }
+                console.log("Player:" + data[highestId].name + " score:" + highest);
                     
         	});
     
