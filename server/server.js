@@ -41,6 +41,7 @@ io.sockets.on('connection', function (socket) {
         var id = data.id;
 
         playerList[id].score = data.score;
+        playerList[data.id].end = false;
         console.log(playerList);
         
         socket.broadcast.emit('scores', playerList);
@@ -50,21 +51,36 @@ io.sockets.on('connection', function (socket) {
     });
 
     socket.on('win', function (data){
-        console.log("Player " + playerList[data.id].name + " won the game");
-        socket.broadcast.emit('win', { player: playerList[data.id].name,
-                             score: data.score   });
+        var gameFinished = true;
+        //console.log("Player " + playerList[data.id].name + " won the game");
+        playerList[data.id].end = true;
+        console.log(playerList);
+
+        for (var i in playerList) {
+            if (playerList[i].end == false) {
+                gameFinished = false;
+                break;
+            }
+        }
+
+        if(gameFinished) {
+            socket.broadcast.emit('win', playerList);
+            socket.emit('win', playerList);
+        }
     });
 
     socket.on('disconnect', function (data) {
 
         console.log("Disconnection");
         console.log(data);
+        // iPhone sends socket end on disconnection
+        if(data === "booted" || ((data) && data.indexOf("socket end")) >= 0){
 
-        if(data === "booted"){
             socket.get("id", function (error,id){
                 if (error) {
-                    console.log(errpr);
+                    console.log(error);
                 } else {
+                    console.log(" ID : " + id);
                     delete playerList[id];
                 }
                 socket.broadcast.emit('scores', playerList);
