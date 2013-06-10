@@ -53,7 +53,8 @@
 		function loadGameData() {
 
 			mosync.app.screenSetOrientation(mosync.SCREEN_ORIENTATION_PORTRAIT);
-			
+			backImg = document.getElementById("back");
+
 			document.addEventListener("deviceready", function () {
 				// initialization of global vars 
 				// about player data like phone id 
@@ -62,17 +63,18 @@
 				deviceName = device.name;
 				document.getElementById('menu').style.display = "block";
 
-			}, true);
+				document.addEventListener("backbutton", function (){
+					if(multiplayerMode){
+						socket.disconnect();
+						menu();
+						return;
+					}
+					
+					mosync.rlog("1mState : " + mState);
 
-			document.addEventListener("backbutton", function (){
-				if(multiplayerMode){
-					socket.disconnect();
-					menu();
-				}
+					back();
 
-				if( mState = 0 ) {
-					mosync.bridge.send(["close"]);
-				}
+				}, true);
 
 			}, true);
 		}
@@ -92,10 +94,25 @@
 			multiplayerMode = false;
 			document.getElementById('menu').style.display = "none";
 			document.getElementById('gameCanvas').style.display = "block";
+			document.getElementById('back').style.position.top = "-50px";
 			initialize();
 		}
 
+		function back() {
+			mosync.rlog(mState);
+			if( mState === 0 ) {
+				mosync.app.exit();
+			} else if (mState === 0.1) {
+				menu();
+				return;
+			} else if (mState >= 1) {
+				menu();
+				return;
+			}
+		}
+
 		function showMultiplayer() {
+			mState = 0.1;
 			document.getElementById('single').style.display = 'none';
 			document.getElementById('multi').style.marginTop = "70%";
 			document.getElementById('connectionControls').style.display = 'block';
@@ -208,7 +225,9 @@
 
 						mState = 0;
 						mosync.rlog("Disconnection");
-						socket.disconnect();
+						if(multiplayerMode) {
+							socket.disconnect();
+						}
 						menu();
 					} else if (touch.pageY > (mGameFieldTop+mGameFieldSize*10)){
 
@@ -1013,7 +1032,6 @@
 	    function drawScore()
 	    {
 	    	mContext.font = "40px TrebuchetMS";
-
 	    	mContext.save();
 
 			if(mOrientation == 2)

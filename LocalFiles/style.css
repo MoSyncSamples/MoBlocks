@@ -69,6 +69,13 @@ img {
 	display: none;
 }
 
+#back {
+	position: absolute; 
+	width:50px; 
+	bottom:10px; 
+	left:10px;
+}
+
 table {
 	text-align: center;
 	width:100%;
