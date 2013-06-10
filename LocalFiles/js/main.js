@@ -101,7 +101,6 @@
 		function back() {
 			mosync.rlog(mState);
 			if( mState === 0 ) {
-				//mosync.bridge.send(["close"]);
 				mosync.app.exit();
 			} else if (mState === 0.1) {
 				menu();
